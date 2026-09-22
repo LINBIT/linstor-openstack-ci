@@ -1,0 +1,15 @@
+# Runs on the executor. The role returns the public URL to Zuul, which puts
+# it in the Gerrit comment and the dashboard.
+- name: Upload the build's logs
+  hosts: localhost
+  gather_facts: false
+  roles:
+    - generate-zuul-manifest
+    - role: upload-logs-s3
+      zuul_log_path_shard_build: true
+      upload_logs_s3_endpoint: "{{ linbit_log_s3.endpoint }}"
+      zuul_log_bucket: "{{ linbit_log_s3.bucket }}"
+      zuul_log_aws_access_key: "{{ linbit_log_s3.access_key }}"
+      zuul_log_aws_secret_key: "{{ linbit_log_s3.secret_key }}"
+      zuul_log_bucket_public: true
+      zuul_log_create_indexes: true

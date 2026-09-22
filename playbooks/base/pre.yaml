@@ -1,0 +1,15 @@
+- name: Write the job header and inventory into the logs
+  hosts: localhost
+  roles:
+    - role: emit-job-header
+      zuul_log_path_shard_build: true
+    - log-inventory
+
+- name: Prepare every node
+  hosts: all
+  roles:
+    - add-build-sshkey
+    - start-zuul-console
+    - ensure-output-dirs
+    - validate-host
+    - prepare-workspace-git

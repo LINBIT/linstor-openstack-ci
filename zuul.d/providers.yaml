@@ -1,0 +1,53 @@
+# Where zuul-launcher gets build nodes from: throwaway VMs on the LINBIT
+# CI cloud, through the linbit-openstack connection, whose clouds.yaml
+# lives on the Zuul host.
+#
+# Label names must match what the upstream nodesets we load ask for:
+# openstack-two-node-noble wants two "ubuntu-noble" nodes.
+#
+# Cloud prerequisites:
+#   - a Noble cloud image in Glance (image-id below)
+#   - a flavor with 8 vCPU, 8 GB RAM, 80 GB disk (OpenDev's size) plus an
+#     ephemeral disk, which the job uses to back the LINSTOR thin pool
+#   - a keypair named "zuul" holding the public half of the executor's
+#     node key
+#   - the ci-net tenant network and the zuul-nodes security group
+# The deployment playbooks create the last three along with the Zuul VM.
+- image:
+    name: ubuntu-noble
+    type: cloud
+
+- flavor:
+    name: ci-8x8
+
+- label:
+    name: ubuntu-noble
+    description: Ubuntu 24.04, 8 vCPU, 8 GB RAM, 80 GB disk. Matches OpenDev.
+    image: ubuntu-noble
+    flavor: ci-8x8
+
+- section:
+    name: linbit-cloud
+    connection: linbit-openstack
+    flavors:
+      - name: ci-8x8
+        flavor-name: ci-8x8
+
+- provider:
+    name: linbit-cloud-main
+    section: linbit-cloud
+    images:
+      - name: ubuntu-noble
+        image-id: df9ab64f-7498-4db0-b685-a33a1c248f55
+        username: ubuntu
+        python-path: /usr/bin/python3
+    labels:
+      - name: ubuntu-noble
+        key-name: zuul
+        # Nodes get a fixed address on the tenant network only.
+        networks: [ci-net]
+        auto-floating-ip: false
+        security-groups: [zuul-nodes]
+    resource-limits:
+      # Two nodes per run; this allows three runs at once.
+      instances: 6

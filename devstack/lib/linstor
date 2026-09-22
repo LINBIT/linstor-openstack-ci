@@ -1,0 +1,206 @@
+#!/bin/bash
+# Functions for the LINSTOR devstack plugin. Sourced by plugin.sh in every
+# devstack phase, so the configure_cinder_backend_* hooks are visible to
+# lib/cinder when it configures backends.
+
+LINSTOR_URI="http://${LINSTOR_CONTROLLER_HOST}:${LINSTOR_CONTROLLER_PORT}"
+
+function is_linstor_controller_node {
+    [[ "$LINSTOR_REMOTE_CONTROLLER" == "False" ]]
+}
+
+function install_linstor {
+    if ! is_ubuntu; then
+        die $LINENO "The LINSTOR plugin only supports Ubuntu"
+    fi
+    if [[ -n "$LINSTOR_REPO" && "$LINSTOR_REPO" != "none" ]]; then
+        install_package software-properties-common
+        sudo add-apt-repository -y "$LINSTOR_REPO"
+        apt_get update
+    fi
+    # drbd-dkms builds the module against the running kernel. All of this
+    # is a no-op when the CI's pre-run playbook installed the packages.
+    install_package "linux-headers-$(uname -r)" drbd-dkms drbd-utils lvm2 \
+        thin-provisioning-tools linstor-satellite linstor-client
+    if is_linstor_controller_node; then
+        install_package linstor-controller
+    fi
+
+    sudo sed -i 's/^\(\s*\)usage-count .*/\1usage-count no;/' /etc/drbd.d/global_common.conf
+    # Keep LVM from scanning the DRBD devices LINSTOR creates on top of it.
+    sudo tee /etc/lvm/lvmlocal.conf >/dev/null <<'LVM'
+devices {
+	global_filter = [ "r|^/dev/drbd.*|" ]
+}
+LVM
+    sudo modprobe drbd
+}
+
+function wait_for_linstor_controller {
+    local i
+    for i in $(seq 1 60); do
+        if curl -sf "$LINSTOR_URI/v1/controller/version" >/dev/null; then
+            return 0
+        fi
+        sleep 2
+    done
+    die $LINENO "LINSTOR controller at $LINSTOR_URI did not come up"
+}
+
+function start_linstor {
+    if is_linstor_controller_node; then
+        sudo systemctl enable --now linstor-controller
+        wait_for_linstor_controller
+    fi
+    sudo systemctl enable --now linstor-satellite
+}
+
+function stop_linstor {
+    sudo systemctl stop linstor-satellite || true
+    if is_linstor_controller_node; then
+        sudo systemctl stop linstor-controller || true
+    fi
+}
+
+function configure_linstor_client {
+    sudo mkdir -p /etc/linstor
+    sudo tee /etc/linstor/linstor-client.conf >/dev/null <<CONF
+[global]
+controllers=${LINSTOR_CONTROLLER_HOST}:${LINSTOR_CONTROLLER_PORT}
+CONF
+}
+
+function register_linstor_node {
+    wait_for_linstor_controller
+    if ! linstor -m node list --nodes "$LINSTOR_NODE_NAME" | grep -q "\"name\": \"$LINSTOR_NODE_NAME\""; then
+        linstor node create "$LINSTOR_NODE_NAME" "$HOST_IP"
+    fi
+    local i
+    for i in $(seq 1 60); do
+        if linstor node list --nodes "$LINSTOR_NODE_NAME" | grep -q -i online; then
+            return 0
+        fi
+        sleep 2
+    done
+    die $LINENO "LINSTOR satellite $LINSTOR_NODE_NAME did not come online"
+}
+
+function _linstor_device_carries_system {
+    # True when $1 is, or is underneath, a filesystem devstack needs. Compares
+    # device numbers rather than names, and walks the whole dependency tree, so
+    # a root on LUKS, LVM or MD still resolves to the physical disk.
+    local dev=$1 target src devno ancestor
+    devno=$(lsblk -ndo MAJ:MIN "$dev" 2>/dev/null | tr -d ' ')
+    [[ -n "$devno" ]] || return 1
+    for target in / "$DATA_DIR" "$DEST"; do
+        [[ -e "$target" ]] || continue
+        src=$(findmnt -no SOURCE --target "$target" 2>/dev/null) || continue
+        src=${src%%[*}   # drop the [/subvol] suffix findmnt adds for btrfs
+        [[ -b "$src" ]] || continue
+        while read -r ancestor; do
+            [[ "$ancestor" == "$devno" ]] && return 0
+        done < <(lsblk -nsro MAJ:MIN "$src" 2>/dev/null | tr -d ' ')
+    done
+    return 1
+}
+
+function _linstor_claim_device {
+    # Take a whole block device over for the LINSTOR volume group. Everything
+    # on it is destroyed.
+    local dev=$1 mountpoint part
+
+    [[ -b "$dev" ]] || die $LINENO "LINSTOR_BACKING_DEVICE $dev is not a block device"
+    if _linstor_device_carries_system "$dev"; then
+        die $LINENO "refusing to wipe $dev: it carries the root or devstack filesystem"
+    fi
+
+    # Cloud images format a flavor's ephemeral disk and mount it, normally at
+    # /mnt. Release it, deepest mount first, before LVM touches the device.
+    while read -r mountpoint; do
+        [[ -n "$mountpoint" ]] || continue
+        echo "Unmounting $mountpoint to free $dev for LINSTOR"
+        sudo umount "$mountpoint"
+    done < <(lsblk -nro MOUNTPOINT "$dev" | sort -ur)
+
+    # Drop the device and any partition of it from fstab, so a reboot does not
+    # bring the mount back underneath LVM.
+    for part in "$dev" $(lsblk -nro NAME "$dev" | tail -n +2 | sed 's|^|/dev/|'); do
+        sudo sed -i "\|^${part}[[:space:]]|d" /etc/fstab
+        [[ "$part" == "$dev" ]] || sudo wipefs -a "$part" || true
+    done
+    sudo wipefs -a "$dev"
+    sudo pvcreate -ff -y "$dev"
+}
+
+function _linstor_loop_device {
+    # Fall-back for hosts with no spare disk: a sparse file on a loop device.
+    if [[ ! -f "$LINSTOR_BACKING_FILE" ]]; then
+        sudo truncate -s "$LINSTOR_BACKING_FILE_SIZE" "$LINSTOR_BACKING_FILE"
+    fi
+    local dev
+    dev=$(sudo losetup -j "$LINSTOR_BACKING_FILE" | cut -d: -f1)
+    if [[ -z "$dev" ]]; then
+        dev=$(sudo losetup -f --show "$LINSTOR_BACKING_FILE")
+    fi
+    echo "$dev"
+}
+
+function create_linstor_storage_pool {
+    local dev
+    if ! sudo vgs "$LINSTOR_VG" >/dev/null 2>&1; then
+        if [[ -n "$LINSTOR_BACKING_DEVICE" ]]; then
+            dev=$LINSTOR_BACKING_DEVICE
+            _linstor_claim_device "$dev"
+        else
+            dev=$(_linstor_loop_device)
+        fi
+        sudo vgcreate "$LINSTOR_VG" "$dev"
+        sudo lvcreate -l 100%FREE -T "$LINSTOR_VG/$LINSTOR_STORAGE_POOL"
+    fi
+    if ! linstor -m storage-pool list --nodes "$LINSTOR_NODE_NAME" --storage-pools "$LINSTOR_STORAGE_POOL" | grep -q "\"storage_pool_name\": \"$LINSTOR_STORAGE_POOL\""; then
+        linstor storage-pool create lvmthin "$LINSTOR_NODE_NAME" "$LINSTOR_STORAGE_POOL" "$LINSTOR_VG/$LINSTOR_STORAGE_POOL"
+    fi
+}
+
+function show_linstor_status {
+    linstor node list || true
+    linstor storage-pool list || true
+}
+
+function cleanup_linstor {
+    stop_linstor
+    sudo vgremove -f "$LINSTOR_VG" || true
+    if [[ -n "$LINSTOR_BACKING_DEVICE" ]]; then
+        sudo pvremove -ff -y "$LINSTOR_BACKING_DEVICE" || true
+        sudo wipefs -a "$LINSTOR_BACKING_DEVICE" || true
+    else
+        local dev
+        dev=$(sudo losetup -j "$LINSTOR_BACKING_FILE" | cut -d: -f1)
+        if [[ -n "$dev" ]]; then
+            sudo losetup -d "$dev" || true
+        fi
+        sudo rm -f "$LINSTOR_BACKING_FILE"
+    fi
+}
+
+# --- hooks called by devstack's lib/cinder ---------------------------------
+
+function _configure_cinder_backend_linstor {
+    local be_name=$1
+    local driver=$2
+    iniset $CINDER_CONF $be_name volume_backend_name $be_name
+    iniset $CINDER_CONF $be_name volume_driver $driver
+    iniset $CINDER_CONF $be_name linstor_uris "$LINSTOR_URI"
+    # Older driver versions read this one instead.
+    iniset $CINDER_CONF $be_name linstor_default_uri "$LINSTOR_URI"
+    iniset $CINDER_CONF $be_name linstor_default_storage_pool_name "$LINSTOR_STORAGE_POOL"
+}
+
+function configure_cinder_backend_linstordrbd {
+    _configure_cinder_backend_linstor "$1" cinder.volume.drivers.linstordrv.LinstorDrbdDriver
+}
+
+function configure_cinder_backend_linstoriscsi {
+    _configure_cinder_backend_linstor "$1" cinder.volume.drivers.linstordrv.LinstorIscsiDriver
+    iniset $CINDER_CONF $1 target_helper "$CINDER_TARGET_HELPER"
+}

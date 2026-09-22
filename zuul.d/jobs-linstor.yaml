@@ -1,0 +1,71 @@
+# LINSTOR Cinder driver job, built the way upstream builds storage jobs:
+# tempest-multinode-full-py3 from openstack/tempest with this repository
+# enabled as a devstack plugin. Zuul prepares cinder and os-brick at the
+# speculative state of the change under test; devstack uses those
+# checkouts and sets LIBS_FROM_GIT accordingly.
+#
+# Only the DRBD transport is tested. Two DRBD backends give the retype and
+# migration tests a second backend to move volumes to.
+- job:
+    name: linstor-cinder-drbd
+    parent: tempest-multinode-full-py3
+    description: |
+      Two-node devstack (controller plus compute, both running
+      cinder-volume and a LINSTOR satellite) with two LINSTOR DRBD
+      backends, running the tempest volume tests and the
+      cinder-tempest-plugin.
+    timeout: 10800
+    branches: master
+    # Runs after the upstream pre-run playbooks and before stack.sh.
+    pre-run: playbooks/linstor/packages.yaml
+    secrets:
+      - name: linbit_packages
+        secret: linbit_packages
+    required-projects:
+      - opendev.org/openstack/cinder
+      - opendev.org/openstack/os-brick
+      - opendev.org/openstack/cinder-tempest-plugin
+      - github.com/LINBIT/linstor-openstack-ci
+    vars:
+      devstack_plugins:
+        linstor-openstack-ci: https://github.com/LINBIT/linstor-openstack-ci
+      devstack_localrc:
+        # Packages come from the LINBIT repository via the pre-run playbook.
+        LINSTOR_REPO: none
+        # The flavor gives each node an ephemeral disk. Backing the thin pool
+        # with it keeps DRBD replication off the root filesystem.
+        LINSTOR_BACKING_DEVICE: /dev/vdb
+        CINDER_ENABLED_BACKENDS: linstordrbd:linstor-drbd-a,linstordrbd:linstor-drbd-b
+        TEMPEST_VOLUME_VENDOR: LINBIT
+        TEMPEST_STORAGE_PROTOCOL: DRBD
+        TEMPEST_EXTEND_ATTACHED_VOLUME: true
+        TEMPEST_VOLUME_MANAGE_VOLUME: true
+        TEMPEST_VOLUME_REVERT_TO_SNAPSHOT: true
+        # A DRBD resource has one writer; multiattach tests would fail by design.
+        ENABLE_VOLUME_MULTIATTACH: false
+        # Upstream defaults to qemu emulation. Enable once nested virt on
+        # the CI cloud is confirmed; it makes the guest tests much faster.
+        # LIBVIRT_TYPE: kvm
+      devstack_local_conf:
+        test-config:
+          $TEMPEST_CONFIG:
+            compute-feature-enabled:
+              volume_backed_live_migration: true
+      tempest_plugins:
+        - cinder-tempest-plugin
+      tox_envlist: all
+      tempest_test_regex: (volume|cinder_tempest_plugin)
+      zuul_copy_output:
+        /var/log/linstor-controller: logs
+        /var/log/linstor-satellite: logs
+        /etc/linstor: logs
+        /etc/drbd.d: logs
+    group-vars:
+      # Subnodes run cinder-volume too, so they need the same backends.
+      subnode:
+        devstack_localrc:
+          LINSTOR_REPO: none
+          LINSTOR_BACKING_DEVICE: /dev/vdb
+          LINSTOR_REMOTE_CONTROLLER: true
+          CINDER_ENABLED_BACKENDS: linstordrbd:linstor-drbd-a,linstordrbd:linstor-drbd-b
+          ENABLE_VOLUME_MULTIATTACH: false

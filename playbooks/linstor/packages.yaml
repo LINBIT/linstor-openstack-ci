@@ -1,0 +1,69 @@
+# Installs DRBD and LINSTOR from LINBIT's customer repository on every
+# node before devstack runs.
+#
+# Why here and not in the devstack plugin: the repository URL carries the
+# contract token, and apt prints the URL of every package it fetches.
+# devstack's output ends up in the public job logs; this playbook's output
+# does not, because every task that could show the URL runs with no_log.
+# The repository configuration is removed again whatever happens, so
+# nothing collected later can carry the token out.
+- name: Install DRBD and LINSTOR from the LINBIT repository
+  hosts: all
+  become: true
+  vars:
+    linbit_keyring: /usr/share/keyrings/linbit-keyring.asc
+    linbit_sources: /etc/apt/sources.list.d/linbit.sources
+    linbit_packages_to_install:
+      - "linux-headers-{{ ansible_kernel }}"
+      - drbd-dkms
+      - drbd-utils
+      - lvm2
+      - thin-provisioning-tools
+      - linstor-controller
+      - linstor-satellite
+      - linstor-client
+  tasks:
+    - name: Fetch the LINBIT package signing key
+      get_url:
+        url: "{{ linbit_packages.key_url }}"
+        dest: "{{ linbit_keyring }}"
+        mode: "0644"
+
+    - name: Install with the repository configured only for the duration
+      block:
+        - name: Configure the LINBIT repository
+          no_log: true
+          copy:
+            dest: "{{ linbit_sources }}"
+            mode: "0600"
+            content: |
+              Types: deb
+              URIs: {{ linbit_packages.repo_url }}
+              Suites: {{ ansible_distribution_release }}
+              Components: {{ linbit_packages.component }}
+              Signed-By: {{ linbit_keyring }}
+
+        - name: Install the packages
+          no_log: true
+          apt:
+            name: "{{ linbit_packages_to_install }}"
+            state: present
+            update_cache: true
+          register: linbit_apt_result
+      always:
+        - name: Remove the repository configuration
+          no_log: true
+          file:
+            path: "{{ linbit_sources }}"
+            state: absent
+
+        - name: Drop the fetched package lists, whose file names embed the URL
+          shell: rm -f /var/lib/apt/lists/*linbit* && apt-get update -qq
+          args:
+            executable: /bin/bash
+          changed_when: false
+          failed_when: false
+
+    - name: Report the outcome without the apt output
+      debug:
+        msg: "LINBIT packages installed: {{ linbit_apt_result is changed }}"

@@ -1,0 +1,48 @@
+# Pipelines of the "linbit" tenant. Gerrit (review.opendev.org) is the
+# only system reported to. Zuul reads this repository by polling, so
+# changes to it are not tested before they merge.
+#
+# OpenDev rules for third-party CI: one comment per patchset, no vote,
+# every comment links to the wiki page, "recheck" re-runs everything.
+- pipeline:
+    name: check
+    description: |
+      Runs on every new patchset of the watched projects, and again on a
+      "recheck" or "run-linstor" comment.
+    manager: independent
+    precedence: normal
+    require:
+      opendev:
+        open: True
+        current-patchset: True
+    trigger:
+      opendev:
+        - event: patchset-created
+        - event: change-restored
+        - event: comment-added
+          comment: (?i)^(Patch Set [0-9]+:)?( [\w\\+-]*)*(\n\n)?\s*(recheck|run-linstor)
+    success:
+      opendev:
+        comment: true
+    failure:
+      opendev:
+        comment: true
+    success-message: Build succeeded (LINBIT LINSTOR CI).
+    failure-message: |
+      Build failed (LINBIT LINSTOR CI). Comment "recheck" or "run-linstor"
+      to run again.
+    footer-message: |
+      LINBIT LINSTOR CI tests the LINSTOR Cinder driver and does not vote.
+      Wiki: https://wiki.openstack.org/wiki/ThirdPartySystems/LINBIT_LINSTOR_CI
+      Contact: linbit_ci@linbit.com
+
+# Keeps the system exercised when no change is in flight. Results are
+# visible in the Zuul dashboard only.
+- pipeline:
+    name: periodic
+    description: Weekly run of the LINSTOR job against master.
+    manager: independent
+    precedence: low
+    trigger:
+      timer:
+        - time: '0 3 * * 6'

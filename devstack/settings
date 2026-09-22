@@ -1,0 +1,33 @@
+# LINSTOR plugin settings. Override any of these in local.conf.
+
+# Package source for standalone use. The public PPA carries Noble and
+# Jammy. Set to "none" when the packages are already installed or the
+# repository is configured by other means, as the CI does.
+LINSTOR_REPO=${LINSTOR_REPO:-ppa:linbit/linbit-drbd9-stack}
+
+# The devstack controller runs the LINSTOR controller. Subnodes set
+# LINSTOR_REMOTE_CONTROLLER=True and only run a satellite.
+LINSTOR_REMOTE_CONTROLLER=$(trueorfalse False LINSTOR_REMOTE_CONTROLLER)
+LINSTOR_CONTROLLER_HOST=${LINSTOR_CONTROLLER_HOST:-$SERVICE_HOST}
+LINSTOR_CONTROLLER_PORT=${LINSTOR_CONTROLLER_PORT:-3370}
+
+# Every node is a satellite with one thin pool. Two ways to back it:
+#
+#   LINSTOR_BACKING_DEVICE  a whole block device, wiped and used as the only
+#                           physical volume. Preferred wherever a second disk
+#                           exists: DRBD then replicates over real storage
+#                           instead of a file on the root filesystem, which is
+#                           both faster and closer to how the driver is used.
+#   LINSTOR_BACKING_FILE    a sparse file on a loop device. Used when no
+#                           device is given, and the same approach devstack
+#                           takes for its own LVM backend.
+#
+# Setting LINSTOR_BACKING_DEVICE destroys everything on that device. The
+# plugin refuses if it carries the root or devstack filesystem, but it cannot
+# tell your data disk from a scratch disk.
+LINSTOR_NODE_NAME=${LINSTOR_NODE_NAME:-$(hostname)}
+LINSTOR_STORAGE_POOL=${LINSTOR_STORAGE_POOL:-thinpool}
+LINSTOR_VG=${LINSTOR_VG:-linstor_vg}
+LINSTOR_BACKING_DEVICE=${LINSTOR_BACKING_DEVICE:-}
+LINSTOR_BACKING_FILE=${LINSTOR_BACKING_FILE:-$DATA_DIR/linstor-backing-file}
+LINSTOR_BACKING_FILE_SIZE=${LINSTOR_BACKING_FILE_SIZE:-30G}
