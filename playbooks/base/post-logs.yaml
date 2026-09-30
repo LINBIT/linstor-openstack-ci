@@ -11,5 +11,7 @@
       zuul_log_bucket: "{{ linbit_log_s3.bucket }}"
       zuul_log_aws_access_key: "{{ linbit_log_s3.access_key }}"
       zuul_log_aws_secret_key: "{{ linbit_log_s3.secret_key }}"
-      zuul_log_bucket_public: true
+      # No per-object public-read ACL: the bucket is made publicly readable
+      # by its own policy, and the upload keys may not set object ACLs.
+      zuul_log_bucket_public: false
       zuul_log_create_indexes: true
