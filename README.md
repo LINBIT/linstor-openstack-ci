@@ -85,9 +85,9 @@ gives a two-node devstack, a controller plus a compute node, and both run
 the speculative state of the change under test. Tempest then runs the volume
 tests and `cinder-tempest-plugin` against the two DRBD backends.
 
-Each node's thin pool is backed by the flavor's ephemeral disk. Packages come
-from LINBIT's customer repository. `playbooks/linstor/packages.yaml` installs
-them before devstack runs, not the plugin, because the repository URL
+Each node's thin pool is backed by a sparse file on its root disk. Packages
+come from LINBIT's customer repository. `playbooks/linstor/packages.yaml`
+installs them before devstack runs, not the plugin, because the repository URL
 contains a token and devstack's output is published. The playbook hides its
 own output and removes the repository configuration afterwards.
 

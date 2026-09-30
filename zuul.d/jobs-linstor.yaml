@@ -32,9 +32,8 @@
       devstack_localrc:
         # Packages come from the LINBIT repository via the pre-run playbook.
         LINSTOR_REPO: none
-        # The flavor gives each node an ephemeral disk. Backing the thin pool
-        # with it keeps DRBD replication off the root filesystem.
-        LINSTOR_BACKING_DEVICE: /dev/vdb
+        # No LINSTOR_BACKING_DEVICE: the flavor has no second disk, so the
+        # thin pool sits on a sparse file on the root disk.
         # Throwaway nodes: flushes cost most of the DRBD write throughput.
         LINSTOR_DRBD_FLUSHES: false
         CINDER_ENABLED_BACKENDS: linstordrbd:linstor-drbd-a,linstordrbd:linstor-drbd-b
@@ -67,7 +66,6 @@
       subnode:
         devstack_localrc:
           LINSTOR_REPO: none
-          LINSTOR_BACKING_DEVICE: /dev/vdb
           LINSTOR_REMOTE_CONTROLLER: true
           CINDER_ENABLED_BACKENDS: linstordrbd:linstor-drbd-a,linstordrbd:linstor-drbd-b
           ENABLE_VOLUME_MULTIATTACH: false

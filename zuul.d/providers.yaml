@@ -7,8 +7,9 @@
 #
 # Cloud prerequisites:
 #   - a Noble cloud image in Glance (image-id below)
-#   - a flavor with 8 vCPU, 8 GB RAM, 80 GB disk (OpenDev's size) plus an
-#     ephemeral disk, which the job uses to back the LINSTOR thin pool
+#   - a flavor with 8 vCPU and 8 GB RAM; the 80 GB root disk (OpenDev's
+#     size) is a Cinder volume, and the LINSTOR thin pool lives on a
+#     sparse file on it
 #   - a keypair named "zuul" holding the public half of the executor's
 #     node key
 #   - the ci-net tenant network and the zuul-nodes security group
@@ -48,6 +49,12 @@
         networks: [ci-net]
         auto-floating-ip: false
         security-groups: [zuul-nodes]
+        # Root disks come from Cinder, not the computes' small local disks.
+        # The launcher deletes each volume along with its server.
+        boot-from-volume: true
+        volume-size: 80
     resource-limits:
-      # Two nodes per run; this allows three runs at once.
-      instances: 6
+      # Two nodes per run; this allows six runs at once. The project quota
+      # covers twelve, the CPU limit of the three hypervisors at 1:1. Raise
+      # once node boot times and storage latency hold up under load.
+      instances: 12
