@@ -19,6 +19,7 @@ elif [[ "$1" == "stack" && "$2" == "install" ]]; then
     echo_summary "Configuring the LINSTOR cluster"
     start_linstor
     configure_linstor_client
+    configure_linstor_drbd_options
     register_linstor_node
     create_linstor_storage_pool
 elif [[ "$1" == "stack" && "$2" == "extra" ]]; then

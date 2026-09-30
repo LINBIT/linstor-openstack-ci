@@ -11,6 +11,11 @@ LINSTOR_REMOTE_CONTROLLER=$(trueorfalse False LINSTOR_REMOTE_CONTROLLER)
 LINSTOR_CONTROLLER_HOST=${LINSTOR_CONTROLLER_HOST:-$SERVICE_HOST}
 LINSTOR_CONTROLLER_PORT=${LINSTOR_CONTROLLER_PORT:-3370}
 
+# DRBD flushes every write to stable storage on each replica. Throwaway
+# nodes, like the CI's, can turn that off for a large gain in write speed,
+# at the price of losing data on a crash. Read on the controller only.
+LINSTOR_DRBD_FLUSHES=$(trueorfalse True LINSTOR_DRBD_FLUSHES)
+
 # Every node is a satellite with one thin pool. Two ways to back it:
 #
 #   LINSTOR_BACKING_DEVICE  a whole block device, wiped and used as the only

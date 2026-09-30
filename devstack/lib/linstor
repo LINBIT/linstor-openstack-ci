@@ -55,6 +55,13 @@ function start_linstor {
     sudo systemctl enable --now linstor-satellite
 }
 
+function configure_linstor_drbd_options {
+    # Controller-level, so it covers every resource Cinder creates later.
+    if is_linstor_controller_node && [[ "$LINSTOR_DRBD_FLUSHES" == "False" ]]; then
+        linstor controller drbd-options --disk-flushes no --md-flushes no
+    fi
+}
+
 function stop_linstor {
     sudo systemctl stop linstor-satellite || true
     if is_linstor_controller_node; then

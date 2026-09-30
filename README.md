@@ -49,6 +49,7 @@ Set these in `localrc`. `devstack/settings` has the defaults.
 | `LINSTOR_REMOTE_CONTROLLER` | `False` | Set to `True` on subnodes, which then only run a satellite. |
 | `LINSTOR_CONTROLLER_HOST` | `$SERVICE_HOST` | Where the LINSTOR controller listens. |
 | `LINSTOR_CONTROLLER_PORT` | `3370` | LINSTOR REST API port. |
+| `LINSTOR_DRBD_FLUSHES` | `True` | `False` turns off DRBD's disk and metadata flushes: much faster writes, but data is lost on a crash. For throwaway nodes only; the CI sets it. |
 
 When a second disk is available, use `LINSTOR_BACKING_DEVICE`. DRBD then
 replicates over real storage rather than a file on the root filesystem. If
