@@ -13,3 +13,12 @@
     - ensure-output-dirs
     - validate-host
     - prepare-workspace-git
+  tasks:
+    # Stock cloud images ship without package lists. OpenDev's images come
+    # with a warm cache, so upstream jobs install packages without updating
+    # first, and fail here with "No package matching ... is available".
+    - name: Refresh the package lists
+      become: true
+      ansible.builtin.apt:
+        update_cache: true
+      when: ansible_os_family == 'Debian'
