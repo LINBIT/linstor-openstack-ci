@@ -38,7 +38,7 @@
     section: linbit-cloud
     images:
       - name: ubuntu-noble
-        image-id: df9ab64f-7498-4db0-b685-a33a1c248f55
+        image-id: acd25080-40c2-43df-98b8-616acf2555f2
         username: ubuntu
         python-path: /usr/bin/python3
     labels:

@@ -110,10 +110,9 @@ them.
 The tenant loads this repository as a config project. It reaches it through
 a read-only `git` connection, so the Zuul host doesn't need to be reachable
 from outside. The consequence is that Zuul only sees changes once they are
-merged, and nothing tests them before that. Run a change through
-`zuul-admin tenant-conf-check` before merging it. After the merge, run
-`zuul-scheduler smart-reconfigure` if you don't want to wait for the next
-poll.
+merged, and nothing tests them before that. Zuul picks up a merge at the
+connection's next poll, and any configuration error then shows up in the
+dashboard.
 
 The tenant configuration needs something like the following, with
 `github.com` as a `git` connection whose `baseurl` is `https://github.com`:
