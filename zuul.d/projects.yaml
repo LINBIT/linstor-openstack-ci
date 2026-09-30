@@ -1,13 +1,9 @@
-# Which jobs run for which project. Enable in the order given.
-
-# Step one: prove Gerrit reporting end to end without any node. Push a
-# change to ci-sandbox and expect a comment. Step two: swap noop for
-# linstor-cinder-drbd to prove the cloud, the plugin and the log upload.
+# Which jobs run for which project.
 - project:
     name: opendev.org/opendev/ci-sandbox
     check:
       jobs:
-        - noop
+        - linstor-cinder-drbd
 
 # Step three: the real thing, comment only, master branch only.
 # - project:
