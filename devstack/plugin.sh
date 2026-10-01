@@ -17,6 +17,7 @@ if [[ "$1" == "stack" && "$2" == "pre-install" ]]; then
     install_linstor
 elif [[ "$1" == "stack" && "$2" == "install" ]]; then
     echo_summary "Configuring the LINSTOR cluster"
+    configure_linstor_logging
     start_linstor
     configure_linstor_client
     configure_linstor_drbd_options

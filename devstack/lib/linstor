@@ -47,12 +47,37 @@ function wait_for_linstor_controller {
     die $LINENO "LINSTOR controller at $LINSTOR_URI did not come up"
 }
 
+# Sets linstor_level in the [logging] section of a LINSTOR TOML file,
+# adding the section (or the file) if it is missing.
+function _linstor_set_log_level {
+    local file=$1
+    if sudo test -f "$file" && sudo grep -q '^\[logging\]' "$file"; then
+        sudo sed -i -e '/^[[:space:]]*linstor_level[[:space:]]*=/d' \
+            -e "/^\[logging\]/a linstor_level = \"$LINSTOR_LOG_LEVEL\"" "$file"
+    else
+        printf '\n[logging]\nlinstor_level = "%s"\n' "$LINSTOR_LOG_LEVEL" |
+            sudo tee -a "$file" >/dev/null
+    fi
+}
+
+function configure_linstor_logging {
+    [[ -n "$LINSTOR_LOG_LEVEL" ]] || return 0
+    if is_linstor_controller_node; then
+        _linstor_set_log_level /etc/linstor/linstor.toml
+    fi
+    _linstor_set_log_level /etc/linstor/linstor_satellite.toml
+}
+
+# Restart rather than start: installing the packages may already have
+# started the services, before their configuration was written.
 function start_linstor {
     if is_linstor_controller_node; then
-        sudo systemctl enable --now linstor-controller
+        sudo systemctl enable linstor-controller
+        sudo systemctl restart linstor-controller
         wait_for_linstor_controller
     fi
-    sudo systemctl enable --now linstor-satellite
+    sudo systemctl enable linstor-satellite
+    sudo systemctl restart linstor-satellite
 }
 
 function configure_linstor_drbd_options {
