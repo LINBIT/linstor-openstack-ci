@@ -1,13 +1,13 @@
 # The job every other job inherits from. Adapted from zuul/zuul-base-jobs
-# with log upload to S3 added, the one thing a deployer has to supply.
+# with log publishing added, the one thing a deployer has to supply.
 - job:
     name: base
     parent: null
     abstract: true
     description: |
       Copies the prepared git repositories to every node, collects
-      whatever the job leaves in ~/zuul-output on the nodes, and uploads
-      the build's logs to the public S3 bucket.
+      whatever the job leaves in ~/zuul-output on the nodes, and publishes
+      the build's logs on the Zuul VM.
     pre-run: playbooks/base/pre.yaml
     post-run:
       - playbooks/base/post.yaml
@@ -18,6 +18,3 @@
       - zuul: opendev.org/zuul/zuul-jobs
     timeout: 1800
     post-timeout: 1800
-    secrets:
-      - name: linbit_log_s3
-        secret: linbit_log_s3

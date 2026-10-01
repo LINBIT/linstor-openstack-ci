@@ -91,8 +91,8 @@ installs them before devstack runs, not the plugin, because the repository URL
 contains a token and devstack's output is published. The playbook hides its
 own output and removes the repository configuration afterwards.
 
-Logs are uploaded to a public S3 bucket, and the Gerrit comment links to
-them.
+Logs are published on the Zuul VM at https://zuul.linbit.com/logs/ and kept
+for 30 days; the Gerrit comment links to them.
 
 ### Rollout
 
@@ -101,7 +101,7 @@ them.
 1. `opendev/ci-sandbox` runs `noop`. This proves Gerrit reporting without
    booting any node.
 2. `ci-sandbox` runs `linstor-cinder-drbd`. This proves the cloud, the plugin
-   and the log upload.
+   and log publishing.
 3. Cinder and os-brick run `linstor-cinder-drbd` in `check`, and weekly in
    `periodic`.
 
@@ -134,14 +134,14 @@ for a plugin's checkout under that name.
 
 ### Secrets
 
-`zuul.d/secrets.yaml` holds placeholders. Encrypt each real value with the
-tenant's public key for this project, and replace the placeholder with the
-resulting `!encrypted/pkcs1-oaep` block:
+Secrets in `zuul.d/secrets.yaml` are encrypted with the tenant's public key
+for this project. To change a value, encrypt it and replace the existing
+`!encrypted/pkcs1-oaep` block:
 
 ```sh
 echo -n "$VALUE" | zuul-client --zuul-url https://<zuul-web> encrypt \
     --tenant linbit --project github.com/LINBIT/linstor-openstack-ci \
-    --secret-name linbit_log_s3 --field-name access_key
+    --secret-name linbit_packages --field-name repo_url
 ```
 
 Only Zuul can decrypt the result, so it's safe to commit to this public

@@ -1,17 +1,13 @@
-# Runs on the executor. The role returns the public URL to Zuul, which puts
-# it in the Gerrit comment and the dashboard.
-- name: Upload the build's logs
+# Runs on the executor, as trusted code. The executor may write to
+# /var/lib/zuul/logs (trusted_rw_paths), and Caddy on the Zuul VM serves
+# that directory at https://zuul.linbit.com/logs/. The role returns the
+# build's URL to Zuul, which puts it in the Gerrit comment and the
+# dashboard.
+- name: Publish the build's logs
   hosts: localhost
   gather_facts: false
   roles:
     - generate-zuul-manifest
-    - role: upload-logs-s3
-      zuul_log_path_shard_build: true
-      upload_logs_s3_endpoint: "{{ linbit_log_s3.endpoint }}"
-      zuul_log_bucket: "{{ linbit_log_s3.bucket }}"
-      zuul_log_aws_access_key: "{{ linbit_log_s3.access_key }}"
-      zuul_log_aws_secret_key: "{{ linbit_log_s3.secret_key }}"
-      # No per-object public-read ACL: the bucket is made publicly readable
-      # by its own policy, and the upload keys may not set object ACLs.
-      zuul_log_bucket_public: false
-      zuul_log_create_indexes: true
+    - role: upload-logs
+      zuul_logserver_root: /var/lib/zuul/logs
+      zuul_log_url: https://zuul.linbit.com/logs
