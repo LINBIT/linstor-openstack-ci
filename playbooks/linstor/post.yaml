@@ -1,0 +1,62 @@
+# Collects what LINSTOR and DRBD logged and how they ended up.
+#
+# LINSTOR logs to the journal, and devstack only turns devstack@* units
+# into readable screen-*.txt files; everything else is left in the
+# binary devstack.journal.gz. This runs before devstack's own post-run
+# playbook (child post-run playbooks run first), so files written to
+# ~/logs are collected the same way as devstack's screen logs.
+#
+# Nothing here may fail the build: a crashed service is exactly when these
+# files matter, so every command tolerates errors.
+- name: Collect LINSTOR and DRBD logs and state
+  hosts: all
+  become: true
+  vars:
+    linstor_log_dir: "{{ ansible_user_dir }}/logs"
+  tasks:
+    - name: Ensure the log directory exists
+      ansible.builtin.file:
+        path: "{{ linstor_log_dir }}"
+        state: directory
+        owner: "{{ ansible_user }}"
+
+    - name: Export the LINSTOR service journals
+      ansible.builtin.shell:
+        cmd: >-
+          journalctl -o short-precise --no-pager --unit {{ item }}.service
+          > {{ linstor_log_dir }}/screen-{{ item }}.txt
+      loop:
+        - linstor-controller
+        - linstor-satellite
+      failed_when: false
+
+    - name: Record the DRBD and LVM state
+      ansible.builtin.shell:
+        cmd: |
+          for cmd in "drbdsetup status --verbose --statistics" \
+                     "drbdadm status" \
+                     "vgs" \
+                     "lvs -a -o +data_percent,metadata_percent"; do
+            echo "### $cmd"
+            timeout 60 $cmd 2>&1
+            echo
+          done > {{ linstor_log_dir }}/drbd-state.txt
+      failed_when: false
+
+    - name: Record the LINSTOR cluster state
+      ansible.builtin.shell:
+        cmd: |
+          for cmd in "node list" \
+                     "storage-pool list" \
+                     "resource-definition list" \
+                     "resource list" \
+                     "volume list" \
+                     "error-reports list"; do
+            echo "### linstor $cmd"
+            timeout 60 linstor --no-color $cmd 2>&1
+            echo
+          done > {{ linstor_log_dir }}/linstor-state.txt
+      # Subnodes have no controller of their own; they use the one on the
+      # controller node (LINSTOR_REMOTE_CONTROLLER in the job's group-vars).
+      when: inventory_hostname not in groups.get('subnode', [])
+      failed_when: false

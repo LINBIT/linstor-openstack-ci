@@ -18,6 +18,8 @@
     branches: master
     # Runs after the upstream pre-run playbooks and before stack.sh.
     pre-run: playbooks/linstor/packages.yaml
+    # Runs before the upstream post-run playbooks, which collect ~/logs.
+    post-run: playbooks/linstor/post.yaml
     secrets:
       - name: linbit_packages
         secret: linbit_packages
