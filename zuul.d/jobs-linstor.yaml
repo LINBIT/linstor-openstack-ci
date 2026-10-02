@@ -47,6 +47,13 @@
         TEMPEST_VOLUME_REVERT_TO_SNAPSHOT: true
         # A DRBD resource has one writer; multiattach tests would fail by design.
         ENABLE_VOLUME_MULTIATTACH: false
+        # os-brick's encryptors replace the volume's device_path with a symlink
+        # to the dm-crypt device. The driver hands out the /dev/drbdN node
+        # itself, so the node is lost for every later user of that minor and
+        # the satellite fails on it. Re-enable once the driver returns a
+        # symlink; https://review.opendev.org/c/openstack/os-brick/+/1008416
+        # makes os-brick refuse such paths instead of breaking the node.
+        ATTACH_ENCRYPTED_VOLUME_AVAILABLE: false
         # Upstream defaults to qemu emulation. Enable once nested virt on
         # the CI cloud is confirmed; it makes the guest tests much faster.
         # LIBVIRT_TYPE: kvm
