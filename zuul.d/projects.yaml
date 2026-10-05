@@ -1,22 +1,14 @@
-# Which jobs run for which project.
 - project:
-    name: opendev.org/opendev/ci-sandbox
+    name: opendev.org/openstack/cinder
     check:
       jobs:
         - linstor-cinder-drbd
+    periodic:
+      jobs:
+        - linstor-cinder-drbd
 
-# Step three: the real thing, comment only, master branch only.
-# - project:
-#     name: opendev.org/openstack/cinder
-#     check:
-#       jobs:
-#         - linstor-cinder-drbd
-#     periodic:
-#       jobs:
-#         - linstor-cinder-drbd
-#
-# - project:
-#     name: opendev.org/openstack/os-brick
-#     check:
-#       jobs:
-#         - linstor-cinder-drbd
+- project:
+    name: opendev.org/openstack/os-brick
+    check:
+      jobs:
+        - linstor-cinder-drbd
