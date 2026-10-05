@@ -47,8 +47,13 @@
         CINDER_ENABLED_BACKENDS: linstordrbd:linstor-drbd-a,linstordrbd:linstor-drbd-b
         TEMPEST_VOLUME_VENDOR: LINBIT
         TEMPEST_STORAGE_PROTOCOL: DRBD
-        TEMPEST_EXTEND_ATTACHED_VOLUME: true
-        TEMPEST_VOLUME_MANAGE_VOLUME: true
+        # The driver attaches as driver_volume_type 'local', whose nova volume
+        # driver cannot extend, so nova raises ExtendVolumeNotSupported.
+        # Re-enable once nova can extend the connection type the driver uses.
+        TEMPEST_EXTEND_ATTACHED_VOLUME: false
+        # The driver has no manage_existing. Re-enable once it implements
+        # manage_existing and manage_existing_get_size.
+        TEMPEST_VOLUME_MANAGE_VOLUME: false
         TEMPEST_VOLUME_REVERT_TO_SNAPSHOT: true
         # A DRBD resource has one writer; multiattach tests would fail by design.
         ENABLE_VOLUME_MULTIATTACH: false
