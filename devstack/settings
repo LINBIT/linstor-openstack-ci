@@ -16,6 +16,12 @@ LINSTOR_CONTROLLER_PORT=${LINSTOR_CONTROLLER_PORT:-3370}
 # at the price of losing data on a crash. Read on the controller only.
 LINSTOR_DRBD_FLUSHES=$(trueorfalse True LINSTOR_DRBD_FLUSHES)
 
+# Allow two primaries on every resource in DfltRscGrp, the group volumes
+# land in when the driver names none. Live migration needs both hosts to
+# open the volume at once; drivers that switch this per resource during
+# the migration need no help. Read on the controller only.
+LINSTOR_ALLOW_TWO_PRIMARIES=$(trueorfalse False LINSTOR_ALLOW_TWO_PRIMARIES)
+
 # Level of LINSTOR's own loggers on every node: ERROR, WARN, INFO, DEBUG or
 # TRACE. Third-party libraries keep their packaged level. Empty leaves the
 # configuration files alone.

@@ -81,9 +81,15 @@ function start_linstor {
 }
 
 function configure_linstor_drbd_options {
+    is_linstor_controller_node || return 0
     # Controller-level, so it covers every resource Cinder creates later.
-    if is_linstor_controller_node && [[ "$LINSTOR_DRBD_FLUSHES" == "False" ]]; then
+    if [[ "$LINSTOR_DRBD_FLUSHES" == "False" ]]; then
         linstor controller drbd-options --disk-flushes no --md-flushes no
+    fi
+    # Resource-group level only, to keep it off everything else.
+    if [[ "$LINSTOR_ALLOW_TWO_PRIMARIES" == "True" ]]; then
+        linstor resource-group set-property DfltRscGrp \
+            DrbdOptions/Net/allow-two-primaries yes
     fi
 }
 

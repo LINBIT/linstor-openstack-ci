@@ -39,6 +39,11 @@
         # thin pool sits on a sparse file on the root disk.
         # Throwaway nodes: flushes cost most of the DRBD write throughput.
         LINSTOR_DRBD_FLUSHES: false
+        # The in-tree driver never allows two primaries, which live migration
+        # needs. Drop this once the v2 driver (review 964289) merges: it sets
+        # allow-two-primaries per resource only for the migration, and the
+        # group default would hide whether that works.
+        LINSTOR_ALLOW_TWO_PRIMARIES: true
         CINDER_ENABLED_BACKENDS: linstordrbd:linstor-drbd-a,linstordrbd:linstor-drbd-b
         TEMPEST_VOLUME_VENDOR: LINBIT
         TEMPEST_STORAGE_PROTOCOL: DRBD
