@@ -3,16 +3,3 @@
   roles:
     - fetch-output
     - merge-output-to-logs
-  tasks:
-    - name: Record basic host state when the job failed
-      when: not (zuul_success | bool)
-      block:
-        - name: Disk usage
-          raw: timeout -k 5 90 df -h
-          failed_when: false
-        - name: Memory
-          raw: timeout -k 5 90 free -m
-          failed_when: false
-        - name: Leftover virter VMs
-          raw: timeout -k 5 90 virter vm ls
-          failed_when: false
