@@ -96,16 +96,11 @@ own output and removes the repository configuration afterwards.
 Logs are published on the Zuul VM at https://zuul.linbit.com/logs/ and kept
 for 30 days; the Gerrit comment links to them.
 
-### Rollout
+### Projects
 
-`zuul.d/projects.yaml` enables the CI in stages:
-
-1. `opendev/ci-sandbox` runs `noop`. This proves Gerrit reporting without
-   booting any node.
-2. `ci-sandbox` runs `linstor-cinder-drbd`. This proves the cloud, the plugin
-   and log publishing.
-3. Cinder and os-brick run `linstor-cinder-drbd` in `check`, and weekly in
-   `periodic`.
+`zuul.d/projects.yaml` runs `linstor-cinder-drbd` in `check` for Cinder and
+os-brick, and weekly in `periodic` for Cinder. The job only runs on changes
+to `master`.
 
 ### Using this repository as a config project
 
