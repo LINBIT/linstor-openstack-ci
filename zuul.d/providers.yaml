@@ -54,7 +54,8 @@
         boot-from-volume: true
         volume-size: 80
     resource-limits:
-      # Two nodes per run; this allows six runs at once. The project quota
-      # covers twelve, the CPU limit of the three hypervisors at 1:1. Raise
-      # once node boot times and storage latency hold up under load.
-      instances: 12
+      # Two nodes per run; this allows twelve runs at once, the node share
+      # of the project quota (24 x 8 vCPU / 8 GB) set by zuul-deploy.
+      instances: 24
+      cores: 192
+      ram: 196608
